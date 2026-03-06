@@ -304,6 +304,7 @@ class WebChannel(ChatChannel):
             '/stream', 'StreamHandler',
             '/chat', 'ChatHandler',
             '/config', 'ConfigHandler',
+            '/api/config/test_connection', 'TestConnectionHandler',
             '/api/channels', 'ChannelsHandler',
             '/api/tools', 'ToolsHandler',
             '/api/skills', 'SkillsHandler',
@@ -469,6 +470,13 @@ class ConfigHandler:
             "api_base_default": None,
             "models": _RECOMMENDED_MODELS,
         }),
+        ("custom", {
+            "label": "Custom (OpenAI-Compatible)",
+            "api_key_field": "open_ai_api_key",
+            "api_base_key": "open_ai_api_base",
+            "api_base_default": "https://api.openai.com/v1",
+            "models": [],
+        }),
     ])
 
     EDITABLE_KEYS = {
@@ -575,6 +583,53 @@ class ConfigHandler:
         except Exception as e:
             logger.error(f"Error updating config: {e}")
             return json.dumps({"status": "error", "message": str(e)})
+
+
+class TestConnectionHandler:
+    def POST(self):
+        import requests
+        web.header('Content-Type', 'application/json; charset=utf-8')
+        try:
+            body = json.loads(web.data())
+            api_base = body.get("api_base", "")
+            api_key = body.get("api_key", "")
+            model = body.get("model", "")
+            
+            if not api_base or not api_key or not model:
+                return json.dumps({"status": "error", "message": "Missing required parameters (api_base, api_key, model)"})
+                
+            # Make sure it ends with /chat/completions for OpenAI compatible API
+            url = api_base.rstrip('/')
+            if not url.endswith('/chat/completions'):
+                url = f"{url}/chat/completions"
+                
+            headers = {
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json"
+            }
+            payload = {
+                "model": model,
+                "messages": [{"role": "user", "content": "hello"}],
+                "max_tokens": 5
+            }
+            
+            try:
+                # Use a short timeout so the UI doesn't hang forever on bad URLs
+                response = requests.post(url, headers=headers, json=payload, timeout=10)
+                
+                if response.status_code == 200:
+                    return json.dumps({"status": "success", "message": "Connection successful"})
+                else:
+                    return json.dumps({
+                        "status": "error", 
+                        "message": f"Connection failed. HTTP Status {response.status_code}. Response: {response.text[:200]}"
+                    })
+            except requests.exceptions.RequestException as e:
+                return json.dumps({"status": "error", "message": f"Connection failed. Error: {str(e)}"})
+                
+        except Exception as e:
+            logger.error(f"Error in test connection: {e}")
+            return json.dumps({"status": "error", "message": f"Server error: {str(e)}"})
 
 
 class ChannelsHandler:

@@ -30,7 +30,7 @@ const I18N = {
         config_channel_type: '通道类型',
         config_provider: '模型厂商', config_model_name: '模型',
         config_custom_model_hint: '输入自定义模型名称',
-        config_save: '保存', config_saved: '已保存',
+        config_save: '保存', config_saved: '已保存', config_test_conn: '测试连接',
         config_save_error: '保存失败',
         config_custom_option: '自定义...',
         skills_title: '技能管理', skills_desc: '查看、启用或禁用 Agent 技能',
@@ -76,7 +76,7 @@ const I18N = {
         config_channel_type: 'Channel Type',
         config_provider: 'Provider', config_model_name: 'Model',
         config_custom_model_hint: 'Enter custom model name',
-        config_save: 'Save', config_saved: 'Saved',
+        config_save: 'Save', config_saved: 'Saved', config_test_conn: 'Test Connection',
         config_save_error: 'Save failed',
         config_custom_option: 'Custom...',
         skills_title: 'Skills', skills_desc: 'View, enable, or disable agent skills',
@@ -160,13 +160,13 @@ function toggleTheme() {
 // Sidebar & Navigation
 // =====================================================================
 const VIEW_META = {
-    chat:     { group: 'nav_chat',    page: 'menu_chat' },
-    config:   { group: 'nav_manage',  page: 'menu_config' },
-    skills:   { group: 'nav_manage',  page: 'menu_skills' },
-    memory:   { group: 'nav_manage',  page: 'menu_memory' },
-    channels: { group: 'nav_manage',  page: 'menu_channels' },
-    tasks:    { group: 'nav_manage',  page: 'menu_tasks' },
-    logs:     { group: 'nav_monitor', page: 'menu_logs' },
+    chat: { group: 'nav_chat', page: 'menu_chat' },
+    config: { group: 'nav_manage', page: 'menu_config' },
+    skills: { group: 'nav_manage', page: 'menu_skills' },
+    memory: { group: 'nav_manage', page: 'menu_memory' },
+    channels: { group: 'nav_manage', page: 'menu_channels' },
+    tasks: { group: 'nav_manage', page: 'menu_tasks' },
+    logs: { group: 'nav_monitor', page: 'menu_logs' },
 };
 
 let currentView = 'chat';
@@ -232,17 +232,17 @@ window.addEventListener('resize', () => {
 function createMd() {
     const md = window.markdownit({
         html: false, breaks: true, linkify: true, typographer: true,
-        highlight: function(str, lang) {
+        highlight: function (str, lang) {
             if (lang && hljs.getLanguage(lang)) {
-                try { return hljs.highlight(str, { language: lang }).value; } catch (_) {}
+                try { return hljs.highlight(str, { language: lang }).value; } catch (_) { }
             }
             return hljs.highlightAuto(str).value;
         }
     });
-    const defaultLinkOpen = md.renderer.rules.link_open || function(tokens, idx, options, env, self) {
+    const defaultLinkOpen = md.renderer.rules.link_open || function (tokens, idx, options, env, self) {
         return self.renderToken(tokens, idx, options);
     };
-    md.renderer.rules.link_open = function(tokens, idx, options, env, self) {
+    md.renderer.rules.link_open = function (tokens, idx, options, env, self) {
         tokens[idx].attrPush(['target', '_blank']);
         tokens[idx].attrPush(['rel', 'noopener noreferrer']);
         return defaultLinkOpen(tokens, idx, options, env, self);
@@ -269,7 +269,7 @@ let appConfig = { use_agent: false, title: 'CowAgent', subtitle: '', providers: 
 const SESSION_ID_KEY = 'cow_session_id';
 
 function generateSessionId() {
-    return 'session_' + ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c =>
+    return 'session_' + ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, c =>
         (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
     );
 }
@@ -312,7 +312,7 @@ chatInput.addEventListener('compositionstart', () => { isComposing = true; });
 // keydown has been processed, fixing the Safari IME Enter-to-confirm bug.
 chatInput.addEventListener('compositionend', () => { setTimeout(() => { isComposing = false; }, 0); });
 
-chatInput.addEventListener('input', function() {
+chatInput.addEventListener('input', function () {
     this.style.height = '42px';
     const scrollH = this.scrollHeight;
     const newH = Math.min(scrollH, 180);
@@ -321,7 +321,7 @@ chatInput.addEventListener('input', function() {
     sendBtn.disabled = !this.value.trim();
 });
 
-chatInput.addEventListener('keydown', function(e) {
+chatInput.addEventListener('keydown', function (e) {
     if ((e.ctrlKey || e.shiftKey) && e.key === 'Enter') {
         const start = this.selectionStart;
         const end = this.selectionEnd;
@@ -368,24 +368,24 @@ function sendMessage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ session_id: sessionId, message: text, stream: true, timestamp: timestamp.toISOString() })
     })
-    .then(r => r.json())
-    .then(data => {
-        if (data.status === 'success') {
-            if (data.stream) {
-                startSSE(data.request_id, loadingEl, timestamp);
+        .then(r => r.json())
+        .then(data => {
+            if (data.status === 'success') {
+                if (data.stream) {
+                    startSSE(data.request_id, loadingEl, timestamp);
+                } else {
+                    loadingContainers[data.request_id] = loadingEl;
+                    if (!isPolling) startPolling();
+                }
             } else {
-                loadingContainers[data.request_id] = loadingEl;
-                if (!isPolling) startPolling();
+                loadingEl.remove();
+                addBotMessage(t('error_send'), new Date());
             }
-        } else {
+        })
+        .catch(err => {
             loadingEl.remove();
-            addBotMessage(t('error_send'), new Date());
-        }
-    })
-    .catch(err => {
-        loadingEl.remove();
-        addBotMessage(err.name === 'AbortError' ? t('error_timeout') : t('error_send'), new Date());
-    });
+            addBotMessage(err.name === 'AbortError' ? t('error_timeout') : t('error_send'), new Date());
+        });
 }
 
 function startSSE(requestId, loadingEl, timestamp) {
@@ -419,7 +419,7 @@ function startSSE(requestId, loadingEl, timestamp) {
         contentEl = botEl.querySelector('.answer-content');
     }
 
-    es.onmessage = function(e) {
+    es.onmessage = function (e) {
         let item;
         try { item = JSON.parse(e.data); } catch (_) { return; }
 
@@ -531,7 +531,7 @@ function startSSE(requestId, loadingEl, timestamp) {
         }
     };
 
-    es.onerror = function() {
+    es.onerror = function () {
         es.close();
         delete activeStreams[requestId];
         if (loadingEl) { loadingEl.remove(); loadingEl = null; }
@@ -558,20 +558,20 @@ function startPolling() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ session_id: sessionId })
         })
-        .then(r => r.json())
-        .then(data => {
-            if (data.status === 'success' && data.has_content) {
-                const rid = data.request_id;
-                if (loadingContainers[rid]) {
-                    loadingContainers[rid].remove();
-                    delete loadingContainers[rid];
+            .then(r => r.json())
+            .then(data => {
+                if (data.status === 'success' && data.has_content) {
+                    const rid = data.request_id;
+                    if (loadingContainers[rid]) {
+                        loadingContainers[rid].remove();
+                        delete loadingContainers[rid];
+                    }
+                    addBotMessage(data.content, new Date(data.timestamp * 1000), rid);
+                    scrollChatToBottom();
                 }
-                addBotMessage(data.content, new Date(data.timestamp * 1000), rid);
-                scrollChatToBottom();
-            }
-            setTimeout(poll, 2000);
-        })
-        .catch(() => { setTimeout(poll, 3000); });
+                setTimeout(poll, 2000);
+            })
+            .catch(() => { setTimeout(poll, 3000); });
     }
     poll();
 }
@@ -718,7 +718,7 @@ function loadHistory(page) {
                 messagesDiv.scrollTop = messagesDiv.scrollHeight - prevScrollHeight;
             }
         })
-        .catch(() => {})
+        .catch(() => { })
         .finally(() => { historyLoading = false; });
 }
 
@@ -742,7 +742,7 @@ function addLoadingIndicator() {
 
 function newChat() {
     // Close all active SSE connections for the current session
-    Object.values(activeStreams).forEach(es => { try { es.close(); } catch (_) {} });
+    Object.values(activeStreams).forEach(es => { try { es.close(); } catch (_) { } });
     activeStreams = {};
 
     // Generate a fresh session and persist it so the next page load also starts clean
@@ -959,21 +959,21 @@ function onProviderChange(pid) {
         if (toggleIcon) toggleIcon.className = 'fas fa-eye text-xs';
 
         if (!keyInput._cfgBound) {
-            keyInput.addEventListener('focus', function() {
+            keyInput.addEventListener('focus', function () {
                 if (this.dataset.masked === '1') {
                     this.value = '';
                     this.dataset.masked = '';
                     this.classList.remove('cfg-key-masked');
                 }
             });
-            keyInput.addEventListener('blur', function() {
+            keyInput.addEventListener('blur', function () {
                 if (!this.value.trim() && this.dataset.maskedVal) {
                     this.value = this.dataset.maskedVal;
                     this.dataset.masked = '1';
                     this.classList.add('cfg-key-masked');
                 }
             });
-            keyInput.addEventListener('input', function() {
+            keyInput.addEventListener('input', function () {
                 this.dataset.masked = '';
             });
             keyInput._cfgBound = true;
@@ -1005,6 +1005,17 @@ function onModelSelectChange(val) {
     } else {
         customWrap.classList.add('hidden');
         document.getElementById('cfg-model-custom').value = '';
+    }
+
+    // Show Test button only for OpenAI compatible API Base (or custom)
+    const p = configProviders[cfgProviderValue];
+    const testBtn = document.getElementById('cfg-model-test');
+    if (testBtn) {
+        if (cfgProviderValue === 'custom' || (p && p.api_base_key)) {
+            testBtn.classList.remove('hidden');
+        } else {
+            testBtn.classList.add('hidden');
+        }
     }
 }
 
@@ -1048,13 +1059,78 @@ function toggleApiKeyVisibility() {
     }
 }
 
-function showStatus(elId, msgKey, isError) {
+function showStatus(elId, msgKey, isError, customMsg = null) {
     const el = document.getElementById(elId);
-    el.textContent = t(msgKey);
+    el.textContent = customMsg || t(msgKey);
     el.classList.toggle('text-red-500', !!isError);
     el.classList.toggle('text-primary-500', !isError);
     el.classList.remove('opacity-0');
-    setTimeout(() => el.classList.add('opacity-0'), 2500);
+    setTimeout(() => el.classList.add('opacity-0'), customMsg ? 4000 : 2500);
+}
+
+function testModelConnection() {
+    const model = getSelectedModel();
+    const p = configProviders[cfgProviderValue];
+    let api_base = '';
+    let api_key = '';
+
+    if (p && p.api_base_key) {
+        api_base = document.getElementById('cfg-api-base').value.trim();
+        // Fallback to default if not entered
+        if (!api_base && p.api_base_default) {
+            api_base = p.api_base_default;
+        }
+    }
+
+    if (p && p.api_key_field) {
+        const keyInput = document.getElementById('cfg-api-key');
+        api_key = keyInput.value.trim();
+        if (keyInput.dataset.masked === '1' && keyInput.dataset.maskedVal) {
+            api_key = configApiKeys[p.api_key_field] || keyInput.dataset.maskedVal;
+            // Fallback: If it's masked and we don't have the unmasked version in configApiKeys, 
+            // the backend cannot test it directly unless we save it or they enter it again.
+            // But we can just use the masked flag. Web console won't send masked keys to test normally.
+        }
+    }
+
+    if (!api_base) {
+        showStatus('cfg-model-status', null, true, 'Base URL is required for testing.');
+        return;
+    }
+    if (!api_key || api_key.includes('***')) {
+        showStatus('cfg-model-status', null, true, 'Please enter the full API Key to test.');
+        return;
+    }
+    if (!model) {
+        showStatus('cfg-model-status', null, true, 'Model name is required.');
+        return;
+    }
+
+    const btn = document.getElementById('cfg-model-test');
+    const originalText = btn.textContent;
+    btn.textContent = 'Testing...';
+    btn.disabled = true;
+
+    fetch('/api/config/test_connection', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ api_base, api_key, model })
+    })
+        .then(r => r.json())
+        .then(data => {
+            if (data.status === 'success') {
+                showStatus('cfg-model-status', null, false, currentLang === 'zh' ? '✅ 测试通过' : '✅ Connection test successful');
+            } else {
+                showStatus('cfg-model-status', null, true, '❌ ' + (data.message || 'Test failed'));
+            }
+        })
+        .catch(e => {
+            showStatus('cfg-model-status', null, true, '❌ ' + e.message);
+        })
+        .finally(() => {
+            btn.textContent = originalText;
+            btn.disabled = false;
+        });
 }
 
 function saveModelConfig() {
@@ -1083,39 +1159,39 @@ function saveModelConfig() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ updates })
     })
-    .then(r => r.json())
-    .then(data => {
-        if (data.status === 'success') {
-            configCurrentModel = model;
-            if (data.applied) {
-                const keyInput = document.getElementById('cfg-api-key');
-                Object.entries(data.applied).forEach(([k, v]) => {
-                    if (k === 'model') return;
-                    if (k.includes('api_key')) {
-                        const masked = v.length > 8
-                            ? v.substring(0, 4) + '*'.repeat(v.length - 8) + v.substring(v.length - 4)
-                            : v;
-                        configApiKeys[k] = masked;
-                        if (keyInput.dataset.field === k) {
-                            keyInput.value = masked;
-                            keyInput.dataset.masked = '1';
-                            keyInput.dataset.maskedVal = masked;
-                            keyInput.classList.add('cfg-key-masked');
-                            const toggleIcon = document.querySelector('#cfg-api-key-toggle i');
-                            if (toggleIcon) toggleIcon.className = 'fas fa-eye text-xs';
+        .then(r => r.json())
+        .then(data => {
+            if (data.status === 'success') {
+                configCurrentModel = model;
+                if (data.applied) {
+                    const keyInput = document.getElementById('cfg-api-key');
+                    Object.entries(data.applied).forEach(([k, v]) => {
+                        if (k === 'model') return;
+                        if (k.includes('api_key')) {
+                            const masked = v.length > 8
+                                ? v.substring(0, 4) + '*'.repeat(v.length - 8) + v.substring(v.length - 4)
+                                : v;
+                            configApiKeys[k] = masked;
+                            if (keyInput.dataset.field === k) {
+                                keyInput.value = masked;
+                                keyInput.dataset.masked = '1';
+                                keyInput.dataset.maskedVal = masked;
+                                keyInput.classList.add('cfg-key-masked');
+                                const toggleIcon = document.querySelector('#cfg-api-key-toggle i');
+                                if (toggleIcon) toggleIcon.className = 'fas fa-eye text-xs';
+                            }
+                        } else {
+                            configApiBases[k] = v;
                         }
-                    } else {
-                        configApiBases[k] = v;
-                    }
-                });
+                    });
+                }
+                showStatus('cfg-model-status', 'config_saved', false);
+            } else {
+                showStatus('cfg-model-status', 'config_save_error', true);
             }
-            showStatus('cfg-model-status', 'config_saved', false);
-        } else {
-            showStatus('cfg-model-status', 'config_save_error', true);
-        }
-    })
-    .catch(() => showStatus('cfg-model-status', 'config_save_error', true))
-    .finally(() => { btn.disabled = false; });
+        })
+        .catch(() => showStatus('cfg-model-status', 'config_save_error', true))
+        .finally(() => { btn.disabled = false; });
 }
 
 function saveAgentConfig() {
@@ -1132,16 +1208,16 @@ function saveAgentConfig() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ updates })
     })
-    .then(r => r.json())
-    .then(data => {
-        if (data.status === 'success') {
-            showStatus('cfg-agent-status', 'config_saved', false);
-        } else {
-            showStatus('cfg-agent-status', 'config_save_error', true);
-        }
-    })
-    .catch(() => showStatus('cfg-agent-status', 'config_save_error', true))
-    .finally(() => { btn.disabled = false; });
+        .then(r => r.json())
+        .then(data => {
+            if (data.status === 'success') {
+                showStatus('cfg-agent-status', 'config_saved', false);
+            } else {
+                showStatus('cfg-agent-status', 'config_save_error', true);
+            }
+        })
+        .catch(() => showStatus('cfg-agent-status', 'config_save_error', true))
+        .finally(() => { btn.disabled = false; });
 }
 
 function loadConfigView() {
@@ -1149,7 +1225,7 @@ function loadConfigView() {
         if (data.status !== 'success') return;
         appConfig = data;
         initConfigView(data);
-    }).catch(() => {});
+    }).catch(() => { });
 }
 
 // =====================================================================
@@ -1249,7 +1325,7 @@ function loadSkillsSection() {
             renderSkillCard(card, sk);
             listEl.appendChild(card);
         });
-    }).catch(() => {});
+    }).catch(() => { });
 }
 
 function renderSkillCard(card, sk) {
@@ -1290,24 +1366,24 @@ function toggleSkill(name, currentlyEnabled) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action, name })
     })
-    .then(r => r.json())
-    .then(data => {
-        if (data.status === 'success') {
-            if (card) {
-                const desc = card.dataset.skillDesc || '';
-                card.dataset.enabled = currentlyEnabled ? '0' : '1';
-                card.style.opacity = '1';
-                renderSkillCard(card, { name, description: desc, enabled: !currentlyEnabled });
+        .then(r => r.json())
+        .then(data => {
+            if (data.status === 'success') {
+                if (card) {
+                    const desc = card.dataset.skillDesc || '';
+                    card.dataset.enabled = currentlyEnabled ? '0' : '1';
+                    card.style.opacity = '1';
+                    renderSkillCard(card, { name, description: desc, enabled: !currentlyEnabled });
+                }
+            } else {
+                if (card) card.style.opacity = '1';
+                alert(currentLang === 'zh' ? '操作失败，请稍后再试' : 'Operation failed, please try again');
             }
-        } else {
+        })
+        .catch(() => {
             if (card) card.style.opacity = '1';
             alert(currentLang === 'zh' ? '操作失败，请稍后再试' : 'Operation failed, please try again');
-        }
-    })
-    .catch(() => {
-        if (card) card.style.opacity = '1';
-        alert(currentLang === 'zh' ? '操作失败，请稍后再试' : 'Operation failed, please try again');
-    });
+        });
 }
 
 // =====================================================================
@@ -1362,7 +1438,7 @@ function loadMemoryView(page) {
         if (page < totalPages) pagHtml += `<button onclick="loadMemoryView(${page + 1})" class="px-3 py-1 rounded-lg border border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-white/10 text-xs">Next</button>`;
         pagHtml += '</div>';
         pagEl.innerHTML = pagHtml;
-    }).catch(() => {});
+    }).catch(() => { });
 }
 
 function openMemoryFile(filename) {
@@ -1374,7 +1450,7 @@ function openMemoryFile(filename) {
         document.getElementById('memory-viewer-content').innerHTML = renderMarkdown(data.content || '');
         panel.classList.remove('hidden');
         applyHighlighting(panel);
-    }).catch(() => {});
+    }).catch(() => { });
 }
 
 function closeMemoryViewer() {
@@ -1533,7 +1609,7 @@ function buildChannelFieldsHtml(chName, fields) {
 
 function bindSecretFieldEvents(container) {
     container.querySelectorAll('input[data-masked="1"]').forEach(inp => {
-        inp.addEventListener('focus', function() {
+        inp.addEventListener('focus', function () {
             if (this.dataset.masked === '1') {
                 this.value = '';
                 this.dataset.masked = '';
@@ -1576,16 +1652,16 @@ function saveChannelConfig(chName) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'save', channel: chName, config: updates })
     })
-    .then(r => r.json())
-    .then(data => {
-        if (data.status === 'success') {
-            showChannelStatus(chName, data.restarted ? 'channels_restarted' : 'channels_saved', false);
-        } else {
-            showChannelStatus(chName, 'channels_save_error', true);
-        }
-    })
-    .catch(() => showChannelStatus(chName, 'channels_save_error', true))
-    .finally(() => { if (btn) btn.disabled = false; });
+        .then(r => r.json())
+        .then(data => {
+            if (data.status === 'success') {
+                showChannelStatus(chName, data.restarted ? 'channels_restarted' : 'channels_saved', false);
+            } else {
+                showChannelStatus(chName, 'channels_save_error', true);
+            }
+        })
+        .catch(() => showChannelStatus(chName, 'channels_save_error', true))
+        .finally(() => { if (btn) btn.disabled = false; });
 }
 
 function disconnectChannel(chName) {
@@ -1603,14 +1679,14 @@ function disconnectChannel(chName) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: 'disconnect', channel: chName })
             })
-            .then(r => r.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    if (ch) ch.active = false;
-                    renderActiveChannels();
-                }
-            })
-            .catch(() => {});
+                .then(r => r.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        if (ch) ch.active = false;
+                        renderActiveChannels();
+                    }
+                })
+                .catch(() => { });
         }
     });
 }
@@ -1725,19 +1801,19 @@ function submitAddChannel() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'connect', channel: chName, config: updates })
     })
-    .then(r => r.json())
-    .then(data => {
-        if (data.status === 'success') {
-            const ch = channelsData.find(c => c.name === chName);
-            if (ch) ch.active = true;
-            renderActiveChannels();
-        } else {
+        .then(r => r.json())
+        .then(data => {
+            if (data.status === 'success') {
+                const ch = channelsData.find(c => c.name === chName);
+                if (ch) ch.active = true;
+                renderActiveChannels();
+            } else {
+                if (btn) { btn.disabled = false; btn.textContent = t('channels_connect_btn'); }
+            }
+        })
+        .catch(() => {
             if (btn) { btn.disabled = false; btn.textContent = t('channels_connect_btn'); }
-        }
-    })
-    .catch(() => {
-        if (btn) { btn.disabled = false; btn.textContent = t('channels_connect_btn'); }
-    });
+        });
 }
 
 // =====================================================================
@@ -1787,7 +1863,7 @@ function loadTasksView() {
             listEl.appendChild(card);
         });
         tasksLoaded = true;
-    }).catch(() => {});
+    }).catch(() => { });
 }
 
 // =====================================================================
@@ -1801,7 +1877,7 @@ function startLogStream() {
     output.innerHTML = '';
 
     logEventSource = new EventSource('/api/logs');
-    logEventSource.onmessage = function(e) {
+    logEventSource.onmessage = function (e) {
         let item;
         try { item = JSON.parse(e.data); } catch (_) { return; }
 
@@ -1815,7 +1891,7 @@ function startLogStream() {
             output.textContent = item.message || 'Error loading logs';
         }
     };
-    logEventSource.onerror = function() {
+    logEventSource.onerror = function () {
         logEventSource.close();
         logEventSource = null;
     };
@@ -1832,7 +1908,7 @@ function stopLogStream() {
 // View Navigation Hook
 // =====================================================================
 const _origNavigateTo = navigateTo;
-navigateTo = function(viewId) {
+navigateTo = function (viewId) {
     // Stop log stream when leaving logs view
     if (currentView === 'logs' && viewId !== 'logs') stopLogStream();
 
