@@ -209,7 +209,12 @@ class MemoryManager:
         # Generate embeddings (if provider available)
         texts = [chunk.text for chunk in chunks]
         if self.embedding_provider:
-            embeddings = self.embedding_provider.embed_batch(texts)
+            try:
+                embeddings = self.embedding_provider.embed_batch(texts)
+            except Exception as e:
+                from common.log import logger
+                logger.warning(f"[MemoryManager] Failed to embed chunk batch, falling back to None. Error: {e}")
+                embeddings = [None] * len(texts)
         else:
             # No embeddings, just use None
             embeddings = [None] * len(texts)
@@ -326,7 +331,12 @@ class MemoryManager:
         
         texts = [chunk.text for chunk in chunks]
         if self.embedding_provider:
-            embeddings = self.embedding_provider.embed_batch(texts)
+            try:
+                embeddings = self.embedding_provider.embed_batch(texts)
+            except Exception as e:
+                from common.log import logger
+                logger.warning(f"[MemoryManager] Failed to embed file '{file_path.name}', fallback to None. Error: {e}")
+                embeddings = [None] * len(texts)
         else:
             embeddings = [None] * len(texts)
         
