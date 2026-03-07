@@ -20,7 +20,9 @@ class RagSearchTool(BaseTool):
     name: str = "rag_search"
     description: str = (
         "Search the external local knowledge base for factual information, documents, and reference material. "
-        "Use this tool when you need to answer questions based on the user's uploaded knowledge base files."
+        "Use this tool when you need to answer questions based on the user's uploaded knowledge base files. "
+        "IMPORTANT: Always prefer this tool over bash find/grep for knowledge base queries — it is faster, "
+        "more accurate, and does not time out."
     )
     params: dict = {
         "type": "object",
@@ -68,8 +70,13 @@ class RagSearchTool(BaseTool):
         from agent.memory.embedding import create_embedding_provider
         from config import conf
         
-        api_key = conf().get("open_ai_api_key", os.environ.get("OPENAI_API_KEY"))
-        api_base = conf().get("open_ai_api_base", os.environ.get("OPENAI_API_BASE"))
+        # Use custom API key when customAI is active
+        if conf().get("bot_type") == "customAI":
+            api_key = conf().get("custom_api_key", os.environ.get("OPENAI_API_KEY"))
+            api_base = conf().get("custom_api_base", os.environ.get("OPENAI_API_BASE"))
+        else:
+            api_key = conf().get("open_ai_api_key", os.environ.get("OPENAI_API_KEY"))
+            api_base = conf().get("open_ai_api_base", os.environ.get("OPENAI_API_BASE"))
         
         embedding_provider = None
         if api_key:
