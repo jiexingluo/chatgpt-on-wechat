@@ -1066,8 +1066,32 @@ function toggleApiKeyVisibility() {
     const input = document.getElementById('cfg-api-key');
     const icon = document.querySelector('#cfg-api-key-toggle i');
     if (input.classList.contains('cfg-key-masked')) {
-        input.classList.remove('cfg-key-masked');
-        icon.className = 'fas fa-eye-slash text-xs';
+        // Fetch real key from backend
+        const field = input.dataset.field;
+        if (field && input.dataset.masked === '1') {
+            fetch('/api/config/reveal_key', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ field })
+            })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.status === 'success' && data.value) {
+                        input.value = data.value;
+                        input.dataset.masked = '';
+                        input.classList.remove('cfg-key-masked');
+                        icon.className = 'fas fa-eye-slash text-xs';
+                    }
+                })
+                .catch(() => {
+                    // On error, just toggle the CSS
+                    input.classList.remove('cfg-key-masked');
+                    icon.className = 'fas fa-eye-slash text-xs';
+                });
+        } else {
+            input.classList.remove('cfg-key-masked');
+            icon.className = 'fas fa-eye-slash text-xs';
+        }
     } else {
         input.classList.add('cfg-key-masked');
         icon.className = 'fas fa-eye text-xs';
@@ -1100,20 +1124,10 @@ function testModelConnection() {
     if (p && p.api_key_field) {
         const keyInput = document.getElementById('cfg-api-key');
         api_key = keyInput.value.trim();
-        if (keyInput.dataset.masked === '1' && keyInput.dataset.maskedVal) {
-            api_key = configApiKeys[p.api_key_field] || keyInput.dataset.maskedVal;
-            // Fallback: If it's masked and we don't have the unmasked version in configApiKeys, 
-            // the backend cannot test it directly unless we save it or they enter it again.
-            // But we can just use the masked flag. Web console won't send masked keys to test normally.
-        }
     }
 
     if (!api_base) {
         showStatus('cfg-model-status', null, true, 'Base URL is required for testing.');
-        return;
-    }
-    if (!api_key || api_key.includes('***')) {
-        showStatus('cfg-model-status', null, true, 'Please enter the full API Key to test.');
         return;
     }
     if (!model) {
@@ -1126,10 +1140,16 @@ function testModelConnection() {
     btn.textContent = 'Testing...';
     btn.disabled = true;
 
+    // Send key_field so backend can read stored key when api_key is masked
+    const requestBody = { api_base, api_key, model };
+    if (p && p.api_key_field) {
+        requestBody.key_field = p.api_key_field;
+    }
+
     fetch('/api/config/test_connection', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ api_base, api_key, model })
+        body: JSON.stringify(requestBody)
     })
         .then(r => r.json())
         .then(data => {

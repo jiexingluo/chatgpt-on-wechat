@@ -305,6 +305,7 @@ class WebChannel(ChatChannel):
             '/chat', 'ChatHandler',
             '/config', 'ConfigHandler',
             '/api/config/test_connection', 'TestConnectionHandler',
+            '/api/config/reveal_key', 'RevealKeyHandler',
             '/api/channels', 'ChannelsHandler',
             '/api/tools', 'ToolsHandler',
             '/api/skills', 'SkillsHandler',
@@ -616,6 +617,11 @@ class TestConnectionHandler:
             api_base = body.get("api_base", "")
             api_key = body.get("api_key", "")
             model = body.get("model", "")
+            key_field = body.get("key_field", "")  # e.g. 'custom_api_key'
+            
+            # If api_key is masked or empty but key_field is provided, read from config
+            if (not api_key or '***' in api_key or '*****' in api_key) and key_field:
+                api_key = conf().get(key_field, "")
             
             if not api_base or not api_key or not model:
                 return json.dumps({"status": "error", "message": "Missing required parameters (api_base, api_key, model)"})
@@ -653,6 +659,21 @@ class TestConnectionHandler:
             logger.error(f"Error in test connection: {e}")
             return json.dumps({"status": "error", "message": f"Server error: {str(e)}"})
 
+
+class RevealKeyHandler:
+    """Return the unmasked API key for a given config field."""
+    def POST(self):
+        web.header('Content-Type', 'application/json; charset=utf-8')
+        try:
+            body = json.loads(web.data())
+            field = body.get("field", "")
+            if not field or 'api_key' not in field:
+                return json.dumps({"status": "error", "message": "Invalid field"})
+            raw = conf().get(field, "")
+            return json.dumps({"status": "success", "value": raw})
+        except Exception as e:
+            logger.error(f"Error revealing key: {e}")
+            return json.dumps({"status": "error", "message": str(e)})
 
 class ChannelsHandler:
     """API for managing external channel configurations (feishu, dingtalk, etc)."""
