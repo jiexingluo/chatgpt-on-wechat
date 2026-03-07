@@ -69,7 +69,7 @@ class OpenAIEmbeddingProvider(EmbeddingProvider):
 
         # Validate API key
         if not self.api_key or self.api_key in ["", "YOUR API KEY", "YOUR_API_KEY"]:
-            raise ValueError("API key is not configured. Please set 'open_ai_api_key' in config.json")
+            raise ValueError("API key is not configured. Please check your API key settings.")
 
         # Set dimensions based on model
         self._dimensions = self.MODEL_DIMENSIONS.get(self.model, 1536)
@@ -123,7 +123,7 @@ class OpenAIEmbeddingProvider(EmbeddingProvider):
             raise TimeoutError(f"API request timed out after 10s. Please check your network connection. Error: {str(e)}")
         except requests.exceptions.HTTPError as e:
             if e.response.status_code == 401:
-                raise ValueError(f"Invalid API key. Please check your 'open_ai_api_key' in config.json")
+                raise ValueError(f"Invalid API key. Please verify your API key is correct.")
             elif e.response.status_code == 404:
                 raise ValueError(f"Model '{self.model}' not found at {url}. For DashScope, use 'text-embedding-v3'. Error: {e.response.text}")
             elif e.response.status_code == 429:

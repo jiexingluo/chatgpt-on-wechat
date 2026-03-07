@@ -267,9 +267,13 @@ class AgentInitializer:
             from agent.tools import MemorySearchTool, MemoryGetTool
             from config import conf
             
-            # Get OpenAI config
-            openai_api_key = conf().get("open_ai_api_key", "")
-            openai_api_base = conf().get("open_ai_api_base", "")
+            # Get API config for embedding - prefer custom API config when customAI is active
+            if conf().get("bot_type") == "customAI":
+                openai_api_key = conf().get("custom_api_key", "")
+                openai_api_base = conf().get("custom_api_base", "")
+            else:
+                openai_api_key = conf().get("open_ai_api_key", "")
+                openai_api_base = conf().get("open_ai_api_base", "")
             
             # Initialize embedding provider
             embedding_provider = None
@@ -453,8 +457,14 @@ class AgentInitializer:
                 'timezone': timezone_name
             }
         
+        # Use custom_model when bot_type is customAI
+        if conf().get("bot_type") == "customAI":
+            model_name = conf().get("custom_model") or conf().get("model", "unknown")
+        else:
+            model_name = conf().get("model", "unknown")
+
         return {
-            "model": conf().get("model", "unknown"),
+            "model": model_name,
             "workspace": workspace_root,
             "channel": ", ".join(conf().get("channel_type")) if isinstance(conf().get("channel_type"), list) else conf().get("channel_type", "unknown"),
             "_get_current_time": get_current_time  # Dynamic time function
