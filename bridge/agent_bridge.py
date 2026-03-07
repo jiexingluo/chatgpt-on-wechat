@@ -39,8 +39,20 @@ def add_openai_compatible_support(bot_instance):
             """
             Infer API config from common configuration patterns.
             Most OpenAI-compatible bots use similar configuration.
+            When bot_type is customAI, use the isolated custom_* fields.
             """
             from config import conf
+
+            if conf().get("bot_type") == "customAI":
+                return {
+                    'api_key': conf().get("custom_api_key"),
+                    'api_base': conf().get("custom_api_base"),
+                    'model': conf().get("custom_model", "gpt-3.5-turbo"),
+                    'default_temperature': conf().get("temperature", 0.9),
+                    'default_top_p': conf().get("top_p", 1.0),
+                    'default_frequency_penalty': conf().get("frequency_penalty", 0.0),
+                    'default_presence_penalty': conf().get("presence_penalty", 0.0),
+                }
 
             return {
                 'api_key': conf().get("open_ai_api_key"),
@@ -88,6 +100,8 @@ class AgentLLMModel(LLMModel):
     @property
     def model(self):
         from config import conf
+        if conf().get("bot_type") == "customAI":
+            return conf().get("custom_model") or conf().get("model", const.GPT_41)
         return conf().get("model", const.GPT_41)
 
     @model.setter
@@ -97,6 +111,10 @@ class AgentLLMModel(LLMModel):
     def _resolve_bot_type(self, model_name: str) -> str:
         """Resolve bot type from model name, matching Bridge.__init__ logic."""
         from config import conf
+        # If bot_type is explicitly set (e.g. customAI), honour it directly
+        explicit_bot_type = conf().get("bot_type")
+        if explicit_bot_type:
+            return explicit_bot_type
         if conf().get("use_linkai", False) and conf().get("linkai_api_key"):
             return const.LINKAI
         if not model_name or not isinstance(model_name, str):

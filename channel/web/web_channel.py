@@ -589,6 +589,18 @@ class ConfigHandler:
                 json.dump(file_cfg, f, indent=4, ensure_ascii=False)
 
             logger.info(f"[WebChannel] Config updated: {list(applied.keys())}")
+
+            # Reset bot routing so new config takes effect immediately
+            try:
+                from bridge.bridge import Bridge
+                Bridge().reset_bot()
+                # Also clear cached agent sessions so they pick up the new config
+                if hasattr(Bridge(), '_agent_bridge') and Bridge()._agent_bridge:
+                    Bridge()._agent_bridge.clear_all_sessions()
+                logger.info("[WebChannel] Bridge and agent sessions reset after config update")
+            except Exception as reset_err:
+                logger.warning(f"[WebChannel] Failed to reset bridge: {reset_err}")
+
             return json.dumps({"status": "success", "applied": applied}, ensure_ascii=False)
         except Exception as e:
             logger.error(f"Error updating config: {e}")

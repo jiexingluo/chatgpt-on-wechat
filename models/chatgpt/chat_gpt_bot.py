@@ -360,20 +360,32 @@ class CustomAIBot(ChatGPTBot):
     """
     def __init__(self):
         super().__init__()
-        # Override the API keys and base for custom configs only
+        # Override the model for custom configs only
         self.args["model"] = conf().get("custom_model") or conf().get("model", "gpt-3.5-turbo")
+        # Override global openai settings for this bot
+        custom_key = conf().get("custom_api_key")
+        custom_base = conf().get("custom_api_base")
+        if custom_key:
+            openai.api_key = custom_key
+        if custom_base:
+            openai.api_base = custom_base
+
+    def get_api_config(self):
+        """Return isolated custom API configuration."""
+        return {
+            'api_key': conf().get("custom_api_key"),
+            'api_base': conf().get("custom_api_base"),
+            'model': conf().get("custom_model") or conf().get("model", "gpt-3.5-turbo"),
+            'default_temperature': conf().get("temperature", 0.9),
+            'default_top_p': conf().get("top_p", 1.0),
+            'default_frequency_penalty': conf().get("frequency_penalty", 0.0),
+            'default_presence_penalty': conf().get("presence_penalty", 0.0),
+        }
 
     def reply_text(self, session: ChatGPTSession, api_key=None, args=None, retry_count=0) -> dict:
         """Override to always inject custom_api_key and custom_api_base explicitly."""
         custom_key = conf().get("custom_api_key")
         
-        # We need to temporarily override the global base in the openai SDK just for this call,
-        # or we can pass it if not using old openai lib globally.
-        # But actually, openai python module v0.28 relies on openai.api_base being mutated globally
-        # or we just rely on the existing architecture.
-        # Since the framework configures openai.api_base in __init__, we will just do it per request
-        # to ensure it uses the custom base without permanently altering the openAI behavior globally for concurrency,
-        # However, due to openai library structure, setting it on the module is common in this codebase.
         original_base = getattr(openai, "api_base", None)
         custom_base = conf().get("custom_api_base")
         if custom_base:
@@ -385,4 +397,8 @@ class CustomAIBot(ChatGPTBot):
             if original_base is not None:
                 openai.api_base = original_base
             else:
-                delattr(openai, "api_base")
+                try:
+                    delattr(openai, "api_base")
+                except AttributeError:
+                    pass
+
