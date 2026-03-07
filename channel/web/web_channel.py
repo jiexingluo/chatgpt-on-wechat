@@ -480,7 +480,7 @@ class ConfigHandler:
     ])
 
     EDITABLE_KEYS = {
-        "model", "use_linkai",
+        "model", "use_linkai", "bot_type",
         "open_ai_api_base", "claude_api_base", "gemini_api_base",
         "zhipu_ai_api_base", "moonshot_base_url", "ark_base_url",
         "open_ai_api_key", "claude_api_key", "gemini_api_key",
@@ -529,6 +529,7 @@ class ConfigHandler:
                 "status": "success",
                 "use_agent": use_agent,
                 "title": title,
+                "bot_type": local_config.get("bot_type", ""),
                 "model": local_config.get("model", ""),
                 "use_linkai": bool(local_config.get("use_linkai", False)),
                 "channel_type": local_config.get("channel_type", ""),
@@ -561,8 +562,14 @@ class ConfigHandler:
                     value = int(value)
                 if key == "use_linkai":
                     value = bool(value)
-                local_config[key] = value
-                applied[key] = value
+                
+                if value == "" and key == "bot_type":
+                    # Remove bot_type from config to allow auto-detection for non-custom models
+                    local_config.pop("bot_type", None)
+                    applied[key] = ""
+                else:
+                    local_config[key] = value
+                    applied[key] = value
 
             if not applied:
                 return json.dumps({"status": "error", "message": "no valid keys to update"})

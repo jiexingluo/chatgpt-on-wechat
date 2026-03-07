@@ -910,7 +910,7 @@ function initConfigView(data) {
     const providerOpts = Object.entries(configProviders).map(([pid, p]) => ({ value: pid, label: p.label }));
 
     // if use_linkai is enabled, always select linkai as the provider
-    const detected = data.use_linkai ? 'linkai' : detectProvider(configCurrentModel);
+    const detected = data.use_linkai ? 'linkai' : detectProvider(configCurrentModel, data.bot_type);
     cfgProviderValue = detected || (providerOpts[0] ? providerOpts[0].value : '');
 
     initDropdown(providerEl, providerOpts, cfgProviderValue, onProviderChange);
@@ -923,8 +923,13 @@ function initConfigView(data) {
     document.getElementById('cfg-max-steps').value = data.agent_max_steps || 15;
 }
 
-function detectProvider(model) {
+function detectProvider(model, botType) {
     if (!model) return Object.keys(configProviders)[0] || '';
+    if (botType === 'chatGPT' || botType === 'openAI') {
+        const pOpenAI = configProviders['openAI'];
+        if (pOpenAI && pOpenAI.models && pOpenAI.models.includes(model)) return 'openAI';
+        return 'custom';
+    }
     for (const [pid, p] of Object.entries(configProviders)) {
         if (pid === 'linkai') continue;
         if (p.models && p.models.includes(model)) return pid;
@@ -1140,6 +1145,13 @@ function saveModelConfig() {
     const updates = { model: model };
     const p = configProviders[cfgProviderValue];
     updates.use_linkai = (cfgProviderValue === 'linkai');
+
+    if (cfgProviderValue === 'custom' || cfgProviderValue === 'openAI') {
+        updates.bot_type = 'chatGPT';
+    } else {
+        updates.bot_type = ''; // Reset for auto detection
+    }
+
     if (p && p.api_base_key) {
         const base = document.getElementById('cfg-api-base').value.trim();
         if (base) updates[p.api_base_key] = base;
