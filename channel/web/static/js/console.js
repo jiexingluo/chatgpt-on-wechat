@@ -910,13 +910,22 @@ function initConfigView(data) {
     const providerOpts = Object.entries(configProviders).map(([pid, p]) => ({ value: pid, label: p.label }));
 
     // if use_linkai is enabled, always select linkai as the provider
-    const detected = data.use_linkai ? 'linkai' : detectProvider(configCurrentModel, data.bot_type);
+    let detected = '';
+    if (data.bot_type === 'customAI') {
+        detected = 'custom';
+    } else {
+        detected = data.use_linkai ? 'linkai' : detectProvider(configCurrentModel, data.bot_type);
+    }
     cfgProviderValue = detected || (providerOpts[0] ? providerOpts[0].value : '');
 
     initDropdown(providerEl, providerOpts, cfgProviderValue, onProviderChange);
 
     onProviderChange(cfgProviderValue);
-    syncModelSelection(configCurrentModel);
+    if (detected === 'custom' && data.custom_model) {
+        syncModelSelection(data.custom_model);
+    } else {
+        syncModelSelection(configCurrentModel);
+    }
 
     document.getElementById('cfg-max-tokens').value = data.agent_max_context_tokens || 50000;
     document.getElementById('cfg-max-turns').value = data.agent_max_context_turns || 30;
@@ -925,13 +934,14 @@ function initConfigView(data) {
 
 function detectProvider(model, botType) {
     if (!model) return Object.keys(configProviders)[0] || '';
+    if (botType === 'customAI') return 'custom';
     if (botType === 'chatGPT' || botType === 'openAI') {
         const pOpenAI = configProviders['openAI'];
         if (pOpenAI && pOpenAI.models && pOpenAI.models.includes(model)) return 'openAI';
-        return 'custom';
+        return 'openAI'; // default explicit chatGPT types to openAI if custom AI wasn't provided
     }
     for (const [pid, p] of Object.entries(configProviders)) {
-        if (pid === 'linkai') continue;
+        if (pid === 'linkai' || pid === 'custom') continue;
         if (p.models && p.models.includes(model)) return pid;
     }
     return Object.keys(configProviders)[0] || '';
@@ -1142,14 +1152,20 @@ function saveModelConfig() {
     const model = getSelectedModel();
     if (!model) return;
 
-    const updates = { model: model };
+    const updates = {};
     const p = configProviders[cfgProviderValue];
     updates.use_linkai = (cfgProviderValue === 'linkai');
 
-    if (cfgProviderValue === 'custom' || cfgProviderValue === 'openAI') {
-        updates.bot_type = 'chatGPT';
+    if (cfgProviderValue === 'custom') {
+        updates.bot_type = 'customAI';
+        updates.custom_model = model;
     } else {
-        updates.bot_type = ''; // Reset for auto detection
+        updates.model = model;
+        if (cfgProviderValue === 'openAI') {
+            updates.bot_type = 'chatGPT';
+        } else {
+            updates.bot_type = ''; // Reset for auto detection
+        }
     }
 
     if (p && p.api_base_key) {

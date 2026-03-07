@@ -3,7 +3,6 @@ channel factory
 """
 from common import const
 
-
 def create_bot(bot_type):
     """
     create a bot_type instance
@@ -72,5 +71,9 @@ def create_bot(bot_type):
     elif bot_type == const.DOUBAO:
         from models.doubao.doubao_bot import DoubaoBot
         return DoubaoBot()
+
+    elif bot_type == 'customAI':
+        from models.chatgpt.chat_gpt_bot import CustomAIBot
+        return CustomAIBot()
 
     raise RuntimeError

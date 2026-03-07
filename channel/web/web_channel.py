@@ -472,8 +472,9 @@ class ConfigHandler:
         }),
         ("custom", {
             "label": "Custom (OpenAI-Compatible)",
-            "api_key_field": "open_ai_api_key",
-            "api_base_key": "open_ai_api_base",
+            "api_key_field": "custom_api_key",
+            "api_base_key": "custom_api_base",
+            "model_field": "custom_model",
             "api_base_default": "https://api.openai.com/v1",
             "models": [],
         }),
@@ -481,6 +482,7 @@ class ConfigHandler:
 
     EDITABLE_KEYS = {
         "model", "use_linkai", "bot_type",
+        "custom_model", "custom_api_key", "custom_api_base",
         "open_ai_api_base", "claude_api_base", "gemini_api_base",
         "zhipu_ai_api_base", "moonshot_base_url", "ark_base_url",
         "open_ai_api_key", "claude_api_key", "gemini_api_key",
@@ -531,6 +533,7 @@ class ConfigHandler:
                 "title": title,
                 "bot_type": local_config.get("bot_type", ""),
                 "model": local_config.get("model", ""),
+                "custom_model": local_config.get("custom_model", ""),
                 "use_linkai": bool(local_config.get("use_linkai", False)),
                 "channel_type": local_config.get("channel_type", ""),
                 "agent_max_context_tokens": local_config.get("agent_max_context_tokens", 50000),
