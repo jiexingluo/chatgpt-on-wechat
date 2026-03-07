@@ -30,30 +30,77 @@ class EmbeddingProvider(ABC):
 
 
 class OpenAIEmbeddingProvider(EmbeddingProvider):
-    """OpenAI embedding provider using REST API"""
+    """OpenAI compatible embedding provider using REST API
+    
+    Supports OpenAI, Moonshot, DashScope (阿里云百炼), and other OpenAI-compatible APIs
+    """
+    
+    # Default model mappings for different providers
+    DEFAULT_MODELS = {
+        "openai": "text-embedding-3-small",
+        "dashscope": "text-embedding-v3",
+        "moonshot": "text-embedding-3-small",  # Moonshot may not support embedding
+    }
+    
+    # Dimension mappings for different models
+    MODEL_DIMENSIONS = {
+        "text-embedding-3-small": 1536,
+        "text-embedding-3-large": 3072,
+        "text-embedding-v3": 1024,
+        "text-embedding-v2": 1536,
+        "text-embedding-v1": 1536,
+    }
     
     def __init__(self, model: str = "text-embedding-3-small", api_key: Optional[str] = None, api_base: Optional[str] = None):
         """
-        Initialize OpenAI embedding provider
+        Initialize OpenAI compatible embedding provider
         
         Args:
-            model: Model name (text-embedding-3-small or text-embedding-3-large)
-            api_key: OpenAI API key
+            model: Model name (e.g., text-embedding-3-small, text-embedding-v3)
+            api_key: API key
             api_base: Optional API base URL
         """
-        self.model = model
         self.api_key = api_key
         self.api_base = api_base or "https://api.openai.com/v1"
+        
+        # Auto-detect provider and adjust model if needed
+        self.provider = self._detect_provider(self.api_base)
+        self.model = self._resolve_model(model, self.provider)
 
         # Validate API key
         if not self.api_key or self.api_key in ["", "YOUR API KEY", "YOUR_API_KEY"]:
-            raise ValueError("OpenAI API key is not configured. Please set 'open_ai_api_key' in config.json")
+            raise ValueError("API key is not configured. Please set 'open_ai_api_key' in config.json")
 
         # Set dimensions based on model
-        self._dimensions = 1536 if "small" in model else 3072
+        self._dimensions = self.MODEL_DIMENSIONS.get(self.model, 1536)
+        
+        # Adjust API base for DashScope if needed
+        if self.provider == "dashscope" and "compatible-mode" not in self.api_base:
+            # Convert coding.dashscope.aliyuncs.com/v1 to dashscope.aliyuncs.com/compatible-mode/v1
+            self.api_base = self.api_base.replace("coding.dashscope.aliyuncs.com", "dashscope.aliyuncs.com/compatible-mode")
+            if not self.api_base.endswith("/v1"):
+                self.api_base = self.api_base.rstrip("/") + "/v1"
+
+    def _detect_provider(self, api_base: str) -> str:
+        """Detect provider from API base URL"""
+        api_base_lower = api_base.lower()
+        if "dashscope" in api_base_lower or "aliyun" in api_base_lower:
+            return "dashscope"
+        elif "moonshot" in api_base_lower:
+            return "moonshot"
+        elif "openai" in api_base_lower:
+            return "openai"
+        return "openai"  # Default to openai compatible
+    
+    def _resolve_model(self, model: str, provider: str) -> str:
+        """Resolve model name based on provider"""
+        # If model is default but provider needs different model, use provider's default
+        if model == "text-embedding-3-small" and provider in self.DEFAULT_MODELS:
+            return self.DEFAULT_MODELS[provider]
+        return model
 
     def _call_api(self, input_data):
-        """Call OpenAI embedding API using requests"""
+        """Call embedding API using requests"""
         import requests
 
         url = f"{self.api_base}/embeddings"
@@ -67,20 +114,22 @@ class OpenAIEmbeddingProvider(EmbeddingProvider):
         }
 
         try:
-            response = requests.post(url, headers=headers, json=data, timeout=5)
+            response = requests.post(url, headers=headers, json=data, timeout=10)
             response.raise_for_status()
             return response.json()
         except requests.exceptions.ConnectionError as e:
-            raise ConnectionError(f"Failed to connect to OpenAI API at {url}. Please check your network connection and api_base configuration. Error: {str(e)}")
+            raise ConnectionError(f"Failed to connect to API at {url}. Please check your network connection and api_base configuration. Error: {str(e)}")
         except requests.exceptions.Timeout as e:
-            raise TimeoutError(f"OpenAI API request timed out after 10s. Please check your network connection. Error: {str(e)}")
+            raise TimeoutError(f"API request timed out after 10s. Please check your network connection. Error: {str(e)}")
         except requests.exceptions.HTTPError as e:
             if e.response.status_code == 401:
-                raise ValueError(f"Invalid OpenAI API key. Please check your 'open_ai_api_key' in config.json")
+                raise ValueError(f"Invalid API key. Please check your 'open_ai_api_key' in config.json")
+            elif e.response.status_code == 404:
+                raise ValueError(f"Model '{self.model}' not found at {url}. For DashScope, use 'text-embedding-v3'. Error: {e.response.text}")
             elif e.response.status_code == 429:
-                raise ValueError(f"OpenAI API rate limit exceeded. Please try again later.")
+                raise ValueError(f"API rate limit exceeded. Please try again later.")
             else:
-                raise ValueError(f"OpenAI API request failed: {e.response.status_code} - {e.response.text}")
+                raise ValueError(f"API request failed: {e.response.status_code} - {e.response.text}")
 
     def embed(self, text: str) -> List[float]:
         """Generate embedding for text"""
