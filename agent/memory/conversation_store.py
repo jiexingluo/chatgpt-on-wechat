@@ -546,6 +546,82 @@ class ConversationStore:
             finally:
                 conn.close()
 
+    def list_sessions(
+        self,
+        channel_type: Optional[str] = None,
+        limit: int = 100,
+    ) -> List[Dict[str, Any]]:
+        """
+        List all sessions with metadata and a message preview.
+
+        Args:
+            channel_type: Optional filter (e.g. "web", "feishu"). None = all.
+            limit: Maximum number of sessions to return.
+
+        Returns:
+            List of session dicts sorted by last_active descending:
+            [{session_id, channel_type, created_at, last_active, msg_count, preview}]
+        """
+        with self._lock:
+            conn = self._connect()
+            try:
+                if channel_type:
+                    rows = conn.execute(
+                        """
+                        SELECT session_id, channel_type, created_at, last_active, msg_count
+                        FROM sessions
+                        WHERE channel_type = ?
+                        ORDER BY last_active DESC
+                        LIMIT ?
+                        """,
+                        (channel_type, limit),
+                    ).fetchall()
+                else:
+                    rows = conn.execute(
+                        """
+                        SELECT session_id, channel_type, created_at, last_active, msg_count
+                        FROM sessions
+                        ORDER BY last_active DESC
+                        LIMIT ?
+                        """,
+                        (limit,),
+                    ).fetchall()
+
+                result = []
+                for sid, ch_type, created, last_active, msg_count in rows:
+                    # Get preview: first visible user message
+                    preview = ""
+                    preview_row = conn.execute(
+                        """
+                        SELECT content FROM messages
+                        WHERE session_id = ? AND role = 'user'
+                        ORDER BY seq ASC
+                        LIMIT 1
+                        """,
+                        (sid,),
+                    ).fetchone()
+                    if preview_row:
+                        try:
+                            content = json.loads(preview_row[0])
+                            preview = _extract_display_text(content)
+                        except Exception:
+                            preview = str(preview_row[0])
+                        if len(preview) > 60:
+                            preview = preview[:60] + "..."
+
+                    result.append({
+                        "session_id": sid,
+                        "channel_type": ch_type or "web",
+                        "created_at": created,
+                        "last_active": last_active,
+                        "msg_count": msg_count,
+                        "preview": preview,
+                    })
+
+                return result
+            finally:
+                conn.close()
+
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------

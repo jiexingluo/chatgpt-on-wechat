@@ -313,6 +313,8 @@ class WebChannel(ChatChannel):
             '/api/memory/content', 'MemoryContentHandler',
             '/api/scheduler', 'SchedulerHandler',
             '/api/history', 'HistoryHandler',
+            '/api/sessions', 'SessionListHandler',
+            '/api/sessions/delete', 'SessionDeleteHandler',
             '/api/logs', 'LogsHandler',
             '/assets/(.*)', 'AssetsHandler',
         )
@@ -1139,6 +1141,66 @@ class HistoryHandler:
             return json.dumps({"status": "success", **result}, ensure_ascii=False)
         except Exception as e:
             logger.error(f"[WebChannel] History API error: {e}")
+            return json.dumps({"status": "error", "message": str(e)})
+
+
+class SessionListHandler:
+    def GET(self):
+        """
+        Return all sessions with metadata.
+
+        Query params:
+            channel_type  (optional filter, e.g. "web", "feishu")
+        """
+        web.header('Content-Type', 'application/json; charset=utf-8')
+        web.header('Access-Control-Allow-Origin', '*')
+        try:
+            params = web.input(channel_type='')
+            channel_filter = params.channel_type.strip() or None
+
+            from agent.memory import get_conversation_store
+            store = get_conversation_store()
+            sessions = store.list_sessions(channel_type=channel_filter)
+            return json.dumps({"status": "success", "sessions": sessions}, ensure_ascii=False)
+        except Exception as e:
+            logger.error(f"[WebChannel] Sessions list API error: {e}")
+            return json.dumps({"status": "error", "message": str(e)})
+
+
+class SessionDeleteHandler:
+    def POST(self):
+        """
+        Delete a session and its messages.
+
+        Body: { "session_id": "..." }
+        """
+        web.header('Content-Type', 'application/json; charset=utf-8')
+        web.header('Access-Control-Allow-Origin', '*')
+        try:
+            data = json.loads(web.data())
+            session_id = data.get('session_id', '').strip()
+            if not session_id:
+                return json.dumps({"status": "error", "message": "session_id required"})
+
+            from agent.memory import get_conversation_store
+            store = get_conversation_store()
+            store.clear_session(session_id)
+
+            # Also remove in-memory agent if present
+            try:
+                bridge = Bridge()
+                if hasattr(bridge, '_agent_bridge') and bridge._agent_bridge:
+                    ab = bridge._agent_bridge
+                    if session_id in ab.agents:
+                        del ab.agents[session_id]
+                        logger.info(f"[WebChannel] Removed in-memory agent for session: {session_id}")
+            except Exception:
+                pass
+
+            logger.info(f"[WebChannel] Deleted session: {session_id}")
+            return json.dumps({"status": "success"})
+        except Exception as e:
+            logger.error(f"[WebChannel] Session delete error: {e}")
             return json.dumps({"status": "error", "message": str(e)})
 
 

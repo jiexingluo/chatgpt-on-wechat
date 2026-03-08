@@ -56,6 +56,7 @@ const I18N = {
         logs_title: '日志', logs_desc: '实时日志输出 (run.log)',
         logs_live: '实时', logs_coming_msg: '日志流即将在此提供。将连接 run.log 实现类似 tail -f 的实时输出。',
         error_send: '发送失败，请稍后再试。', error_timeout: '请求超时，请再试一次。',
+        sessions_title: '会话列表', readonly_hint: '只读：此会话来自其他通道',
     },
     en: {
         console: 'Console',
@@ -102,6 +103,7 @@ const I18N = {
         logs_title: 'Logs', logs_desc: 'Real-time log output (run.log)',
         logs_live: 'Live', logs_coming_msg: 'Log streaming will be available here. Connects to run.log for real-time output similar to tail -f.',
         error_send: 'Failed to send. Please try again.', error_timeout: 'Request timeout. Please try again.',
+        sessions_title: 'Sessions', readonly_hint: 'Read-only: This session is from another channel',
     }
 };
 
@@ -290,6 +292,8 @@ let sessionId = loadOrCreateSessionId();
 let historyPage = 0;       // last page fetched (0 = nothing fetched yet)
 let historyHasMore = false;
 let historyLoading = false;
+let currentSessionChannelType = 'web'; // track channel of active session
+let sessionFilterChannel = ''; // current filter for session list
 
 fetch('/config').then(r => r.json()).then(data => {
     if (data.status === 'success') {
@@ -798,6 +802,9 @@ function newChat() {
         });
     });
     if (currentView !== 'chat') navigateTo('chat');
+    setReadOnlyMode(false);
+    currentSessionChannelType = 'web';
+    loadSessionList(sessionFilterChannel);
 }
 
 // =====================================================================
@@ -1973,6 +1980,213 @@ navigateTo = function (viewId) {
     else if (viewId === 'tasks') loadTasksView();
     else if (viewId === 'logs') startLogStream();
 };
+
+// =====================================================================
+// Session Management
+// =====================================================================
+
+const SESSION_PANEL_KEY = 'cow_session_panel_open';
+
+function getChannelBadgeClass(channelType) {
+    if (channelType === 'web' || channelType === '') return 'ch-web';
+    if (channelType === 'feishu' || channelType === 'fs') return 'ch-feishu';
+    if (channelType === 'dingtalk') return 'ch-dingtalk';
+    return 'ch-other';
+}
+
+function getChannelIcon(channelType) {
+    if (channelType === 'web' || channelType === '') return 'fa-globe';
+    if (channelType === 'feishu' || channelType === 'fs') return 'fa-paper-plane';
+    if (channelType === 'dingtalk') return 'fa-comment-dots';
+    if (channelType === 'wechat' || channelType === 'wx' || channelType === 'wxy' || channelType === 'wcf') return 'fa-comments';
+    return 'fa-hashtag';
+}
+
+function getChannelLabel(channelType) {
+    if (channelType === 'web' || channelType === '') return 'Web';
+    if (channelType === 'feishu' || channelType === 'fs') return 'Feishu';
+    if (channelType === 'dingtalk') return 'DingTalk';
+    if (channelType === 'wechat' || channelType === 'wx' || channelType === 'wxy' || channelType === 'wcf') return 'WeChat';
+    return channelType || 'Other';
+}
+
+function formatRelativeTime(ts) {
+    const now = Math.floor(Date.now() / 1000);
+    const diff = now - ts;
+    if (diff < 60) return 'just now';
+    if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+    if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+    if (diff < 604800) return Math.floor(diff / 86400) + 'd ago';
+    return new Date(ts * 1000).toLocaleDateString();
+}
+
+function loadSessionList(channelFilter) {
+    const listEl = document.getElementById('session-list');
+    if (!listEl) return;
+
+    const url = channelFilter
+        ? `/api/sessions?channel_type=${encodeURIComponent(channelFilter)}`
+        : '/api/sessions';
+
+    fetch(url)
+        .then(r => r.json())
+        .then(data => {
+            if (data.status !== 'success') {
+                listEl.innerHTML = '<div class="session-list-empty"><i class="fas fa-exclamation-circle"></i><span>Failed to load</span></div>';
+                return;
+            }
+            const sessions = data.sessions || [];
+            if (sessions.length === 0) {
+                listEl.innerHTML = '<div class="session-list-empty"><i class="fas fa-message"></i><span>No sessions yet</span></div>';
+                return;
+            }
+
+            listEl.innerHTML = sessions.map(s => {
+                const isActive = s.session_id === sessionId;
+                const badgeClass = getChannelBadgeClass(s.channel_type);
+                const icon = getChannelIcon(s.channel_type);
+                const label = getChannelLabel(s.channel_type);
+                const timeStr = formatRelativeTime(s.last_active);
+                const preview = s.preview || 'New conversation';
+                const isWeb = (s.channel_type === 'web' || s.channel_type === '');
+                const lockIcon = !isWeb ? '<i class="fas fa-lock" style="font-size:0.55rem;opacity:0.5;margin-left:auto"></i>' : '';
+
+                return `
+                    <div class="session-card${isActive ? ' active' : ''}" onclick="switchSession('${s.session_id}', '${s.channel_type}')">
+                        <div class="session-card-top">
+                            <span class="session-channel-badge ${badgeClass}"><i class="fas ${icon}"></i> ${label}</span>
+                            <span class="session-card-time">${timeStr}</span>
+                            ${lockIcon}
+                        </div>
+                        <div class="session-card-preview">${escapeHtml(preview)}</div>
+                        <div class="session-card-meta">
+                            <span><i class="fas fa-message"></i> ${s.msg_count}</span>
+                        </div>
+                        <button class="session-card-delete" onclick="event.stopPropagation(); deleteSession('${s.session_id}')" title="Delete">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                `;
+            }).join('');
+        })
+        .catch(() => {
+            listEl.innerHTML = '<div class="session-list-empty"><i class="fas fa-exclamation-circle"></i><span>Network error</span></div>';
+        });
+}
+
+function switchSession(sid, channelType) {
+    if (sid === sessionId) return;
+
+    // Close active SSE streams
+    Object.values(activeStreams).forEach(es => { try { es.close(); } catch (_) { } });
+    activeStreams = {};
+
+    // Update session
+    sessionId = sid;
+    localStorage.setItem(SESSION_ID_KEY, sessionId);
+    currentSessionChannelType = channelType || 'web';
+    isPolling = false;
+    loadingContainers = {};
+    historyPage = 0;
+    historyHasMore = false;
+
+    // Clear messages and load history
+    messagesDiv.innerHTML = '';
+    loadHistory(1);
+
+    // Toggle read-only for non-web sessions
+    const isWeb = (channelType === 'web' || channelType === '' || !channelType);
+    setReadOnlyMode(!isWeb);
+
+    // Update session list highlighting
+    loadSessionList(sessionFilterChannel);
+}
+
+function deleteSession(sid) {
+    showConfirmDialog({
+        title: 'Delete Session',
+        message: 'This will permanently delete this conversation and all its messages. Continue?',
+        okText: 'Delete',
+        cancelText: 'Cancel',
+        onConfirm: () => {
+            fetch('/api/sessions/delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ session_id: sid })
+            })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        // If deleted current session, create new one
+                        if (sid === sessionId) {
+                            newChat();
+                        } else {
+                            loadSessionList(sessionFilterChannel);
+                        }
+                    }
+                })
+                .catch(() => { });
+        }
+    });
+}
+
+function toggleSessionPanel() {
+    const panel = document.getElementById('session-panel');
+    const expandBtn = document.getElementById('session-expand-btn');
+    if (!panel) return;
+
+    const isCollapsed = panel.classList.contains('collapsed');
+    if (isCollapsed) {
+        panel.classList.remove('collapsed');
+        expandBtn.classList.add('hidden');
+        localStorage.setItem(SESSION_PANEL_KEY, 'open');
+    } else {
+        panel.classList.add('collapsed');
+        expandBtn.classList.remove('hidden');
+        localStorage.setItem(SESSION_PANEL_KEY, 'closed');
+    }
+}
+
+function filterSessions(btn) {
+    // Update active tab
+    document.querySelectorAll('.session-filter-tab').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+
+    sessionFilterChannel = btn.dataset.filter || '';
+    loadSessionList(sessionFilterChannel);
+}
+
+function setReadOnlyMode(readonly) {
+    const banner = document.getElementById('readonly-banner');
+    const inputArea = document.getElementById('chat-input-area');
+    const chatInputEl = document.getElementById('chat-input');
+    const sendBtn = document.getElementById('send-btn');
+
+    if (readonly) {
+        if (banner) banner.classList.remove('hidden');
+        if (chatInputEl) { chatInputEl.disabled = true; chatInputEl.placeholder = 'Read-only session'; }
+        if (sendBtn) sendBtn.disabled = true;
+        if (inputArea) inputArea.style.opacity = '0.5';
+    } else {
+        if (banner) banner.classList.add('hidden');
+        if (chatInputEl) { chatInputEl.disabled = false; chatInputEl.placeholder = t('input_placeholder'); }
+        // sendBtn enabled state is managed by input handler
+        if (inputArea) inputArea.style.opacity = '1';
+    }
+}
+
+// Restore session panel state from localStorage
+(function initSessionPanel() {
+    const stored = localStorage.getItem(SESSION_PANEL_KEY);
+    if (stored === 'closed') {
+        const panel = document.getElementById('session-panel');
+        const expandBtn = document.getElementById('session-expand-btn');
+        if (panel) panel.classList.add('collapsed');
+        if (expandBtn) expandBtn.classList.remove('hidden');
+    }
+    // Load sessions on startup
+    loadSessionList('');
+})();
 
 // =====================================================================
 // Initialization

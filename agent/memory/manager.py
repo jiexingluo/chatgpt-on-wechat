@@ -57,9 +57,16 @@ class MemoryManager:
         else:
             # Try to create embedding provider, but allow failure
             try:
-                # Get API key from environment or config
-                api_key = os.environ.get('OPENAI_API_KEY')
-                api_base = os.environ.get('OPENAI_API_BASE')
+                # Get API key from config or environment
+                from config import conf
+                channel_conf = conf()
+                api_key = channel_conf.get("open_ai_api_key") or os.environ.get("OPENAI_API_KEY")
+                api_base = channel_conf.get("open_ai_api_base") or os.environ.get("OPENAI_API_BASE")
+                
+                # If custom model is configured, it can be used for embeddings if applicable (e.g., dashscope provides embeddings)
+                if channel_conf.get("bot_type") == "customAI":
+                    api_key = channel_conf.get("custom_api_key") or api_key
+                    api_base = channel_conf.get("custom_api_base") or api_base
                 
                 self.embedding_provider = create_embedding_provider(
                     provider=self.config.embedding_provider,

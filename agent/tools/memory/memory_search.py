@@ -70,8 +70,20 @@ class MemorySearchTool(BaseTool):
             return ToolResult.fail("Error: query parameter is required")
         
         try:
-            # Run async search in sync context
-            results = asyncio.run(self.memory_manager.search(
+            # Run async search in sync context safely
+            def _run_async(coro):
+                try:
+                    loop = asyncio.get_running_loop()
+                except RuntimeError:
+                    loop = None
+                    
+                if loop and loop.is_running():
+                    import concurrent.futures
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                        return executor.submit(lambda: asyncio.run(coro)).result()
+                return asyncio.run(coro)
+                
+            results = _run_async(self.memory_manager.search(
                 query=query,
                 user_id=self.user_id,
                 max_results=max_results,

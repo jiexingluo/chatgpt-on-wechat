@@ -352,3 +352,285 @@
     transform: translateY(-2px);
     box-shadow: 0 8px 25px -5px rgba(0, 0, 0, 0.1);
 }
+
+/* =====================================================================
+   Session Panel
+   ===================================================================== */
+
+/* Chat view needs row direction for session panel + chat area side by side */
+#view-chat.active { flex-direction: row; }
+
+.session-panel {
+    width: 280px;
+    min-width: 280px;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid #e2e8f0;
+    background: #fafbfc;
+    transition: width 0.25s ease, min-width 0.25s ease, opacity 0.2s ease;
+    overflow: hidden;
+}
+.dark .session-panel {
+    border-right-color: rgba(255,255,255,0.08);
+    background: #141414;
+}
+.session-panel.collapsed {
+    width: 0;
+    min-width: 0;
+    border-right: none;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.session-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    border-bottom: 1px solid #e2e8f0;
+    flex-shrink: 0;
+}
+.dark .session-panel-header { border-bottom-color: rgba(255,255,255,0.08); }
+
+.session-panel-title {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #475569;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.dark .session-panel-title { color: #94a3b8; }
+
+.session-panel-actions { display: flex; gap: 4px; }
+
+.session-action-btn {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    border: none;
+    background: transparent;
+    color: #94a3b8;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    font-size: 0.75rem;
+}
+.session-action-btn:hover {
+    background: #e2e8f0;
+    color: #334155;
+}
+.dark .session-action-btn:hover {
+    background: rgba(255,255,255,0.1);
+    color: #e2e8f0;
+}
+
+/* Filter tabs */
+.session-filter-tabs {
+    display: flex;
+    gap: 2px;
+    padding: 8px 10px;
+    border-bottom: 1px solid #e2e8f0;
+    flex-shrink: 0;
+    overflow-x: auto;
+}
+.dark .session-filter-tabs { border-bottom-color: rgba(255,255,255,0.08); }
+
+.session-filter-tab {
+    padding: 4px 8px;
+    border-radius: 6px;
+    border: none;
+    background: transparent;
+    color: #94a3b8;
+    font-size: 0.7rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+}
+.session-filter-tab:hover { background: #e2e8f0; color: #475569; }
+.dark .session-filter-tab:hover { background: rgba(255,255,255,0.08); color: #cbd5e1; }
+.session-filter-tab.active {
+    background: rgba(74, 190, 110, 0.12);
+    color: #228547;
+}
+.dark .session-filter-tab.active {
+    background: rgba(74, 190, 110, 0.15);
+    color: #74E9A4;
+}
+
+/* Session list */
+.session-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 6px;
+}
+
+/* Session card */
+.session-card {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    margin-bottom: 2px;
+    position: relative;
+}
+.session-card:hover { background: #e2e8f0; }
+.dark .session-card:hover { background: rgba(255,255,255,0.06); }
+.session-card.active {
+    background: rgba(74, 190, 110, 0.1);
+    border-left: 3px solid #4ABE6E;
+    padding-left: 9px;
+}
+.dark .session-card.active { background: rgba(74, 190, 110, 0.12); }
+
+.session-card-top {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.session-channel-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 0.6rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    flex-shrink: 0;
+}
+.session-channel-badge.ch-web { background: #dcfce7; color: #166534; }
+.dark .session-channel-badge.ch-web { background: rgba(74,190,110,0.2); color: #74E9A4; }
+.session-channel-badge.ch-feishu { background: #dbeafe; color: #1e40af; }
+.dark .session-channel-badge.ch-feishu { background: rgba(59,130,246,0.2); color: #93c5fd; }
+.session-channel-badge.ch-dingtalk { background: #ffedd5; color: #9a3412; }
+.dark .session-channel-badge.ch-dingtalk { background: rgba(249,115,22,0.2); color: #fdba74; }
+.session-channel-badge.ch-other { background: #f1f5f9; color: #64748b; }
+.dark .session-channel-badge.ch-other { background: rgba(255,255,255,0.1); color: #94a3b8; }
+
+.session-card-time {
+    font-size: 0.65rem;
+    color: #94a3b8;
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+.session-card-preview {
+    font-size: 0.75rem;
+    color: #64748b;
+    line-height: 1.4;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.dark .session-card-preview { color: #94a3b8; }
+
+.session-card-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.625rem;
+    color: #94a3b8;
+}
+
+/* Session delete button (appears on hover) */
+.session-card-delete {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 22px;
+    height: 22px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    border: none;
+    background: rgba(239,68,68,0.1);
+    color: #ef4444;
+    cursor: pointer;
+    font-size: 0.6rem;
+    transition: all 0.15s ease;
+}
+.session-card:hover .session-card-delete { display: flex; }
+.session-card-delete:hover {
+    background: #ef4444;
+    color: white;
+}
+
+/* Expand button (shown when panel is collapsed) */
+.session-expand-btn {
+    width: 28px;
+    min-width: 28px;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-right: 1px solid #e2e8f0;
+    background: #fafbfc;
+    color: #94a3b8;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    font-size: 0.7rem;
+}
+.dark .session-expand-btn {
+    border-right-color: rgba(255,255,255,0.08);
+    background: #141414;
+}
+.session-expand-btn:hover {
+    background: #e2e8f0;
+    color: #475569;
+}
+.dark .session-expand-btn:hover {
+    background: rgba(255,255,255,0.08);
+    color: #cbd5e1;
+}
+
+/* Chat main area */
+.chat-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+/* Read-only banner */
+.readonly-banner {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    background: #fef3c7;
+    color: #92400e;
+    font-size: 0.75rem;
+    font-weight: 500;
+    flex-shrink: 0;
+}
+.dark .readonly-banner {
+    background: rgba(251,191,36,0.12);
+    color: #fbbf24;
+}
+.readonly-banner.hidden { display: none; }
+
+/* Empty session list */
+.session-list-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 16px;
+    color: #94a3b8;
+    text-align: center;
+}
+.session-list-empty i { font-size: 1.5rem; margin-bottom: 8px; opacity: 0.4; }
+.session-list-empty span { font-size: 0.75rem; }
