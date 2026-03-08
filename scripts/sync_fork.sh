@@ -15,14 +15,8 @@ cd "${REPO_DIR}"
   fi
 
   git fetch origin --prune
-  git fetch upstream --prune
   git checkout main
-
-  if ! git merge --no-edit upstream/master; then
-    echo "merge conflict detected, abort merge"
-    git merge --abort || true
-    exit 1
-  fi
+  git pull --ff-only origin main
 
   git push origin main
   echo "sync complete"
